@@ -130,8 +130,19 @@ class facebookReader(object):
         for interaction in interaction_modes: #sharedposts - need to have Luvo grant my app access to be able to get these
             base = "https://graph.facebook.com/v2.11"
             node = "/%s" % status_id
-            parameters = "/" + interaction + "/?access_token=%s" % access_token
-            url = base + node + parameters
+            parameters = "/" + interaction
+            reactions = "/?fields=" \
+                        "reactions.type(LIKE).limit(0).summary(total_count).as(like)" \
+                        ",reactions.type(LOVE).limit(0).summary(total_count).as(love)" \
+                        ",reactions.type(WOW).limit(0).summary(total_count).as(wow)" \
+                        ",reactions.type(HAHA).limit(0).summary(total_count).as(haha)" \
+                        ",reactions.type(SAD).limit(0).summary(total_count).as(sad)" \
+                        ",reactions.type(ANGRY).limit(0).summary(total_count).as(angry)"
+            basic_info = ",created_time,message,parent,from"
+            access_token = "&access_token=%s" % access_token
+            url = base + node + parameters + reactions + basic_info + access_token
+
+
 
             has_next_page = True
             users = json.loads(self.request_until_succeed(url))
@@ -140,21 +151,28 @@ class facebookReader(object):
                 for user in users['data']:
                 
                     # Ensure it is a status with the expected metadata
-                    if interaction == "likes" and 'name' in user:
-                        user_id = user["id"]
+                    if interaction == "likes":# and 'name' in user:
+                        #user_id = user["id"]
+                        user_id = user.get("id", "")
                         #user_name = self.unicode_normalize(user["name"])
-                        user_name = user["name"]
+                        #user_name = user["name"]
+                        user_name = user.get("name")
                         message = "" #no comment text if it's a like
                         self.writeUsersToFile("data/" + page_id + "_facebook_users_interactions.csv", status_id, interaction, user_id, user_name, [message])
-                    if interaction == "comments" and 'from' in user:
-                        user_id = user["from"]["id"]
+                    if interaction == "comments":# and 'from' in user:
+                        #user_id = user["from"]["id"]
+                        user_id = user.get("from", {}).get("id", "")
                         #user_name = self.unicode_normalize(user["from"]["name"])
-                        user_name = user["from"]["name"]
+                        #user_name = user["from"]["name"]
+                        user_name = user.get("from", {}).get("name", "")
                         #message = self.unicode_normalize(user["message"]).replace("\n", " ")
-                        message = user["message"].replace("\n", " ")
+                        #message = user["message"].replace("\n", " ")
+                        message = user.get("message", "").replace("\n", " ")
+
+                        parent_comment_id = user.get("parent", {}).get("id", "")
                         #get additional infor about the comment here
                         comment_id, comment_message, link_name, comment_type, comment_link, comment_published, num_reactions, num_comments, num_shares, num_likes, num_loves, num_wows, num_hahas, num_sads, num_angrys = self.processFacebookPageFeedStatus(user)
-                        self.writeUsersToFile("data/" + page_id + "_facebook_users_interactions.csv", status_id, interaction, user_id, user_name, [comment_id, comment_message, link_name, comment_type, comment_link, comment_published, num_reactions, num_comments, num_shares, num_likes, num_loves, num_wows, num_hahas, num_sads, num_angrys])
+                        self.writeUsersToFile("data/" + page_id + "_facebook_users_interactions.csv", status_id, interaction, user_id, user_name, [comment_id, comment_message, parent_comment_id, link_name, comment_type, comment_link, comment_published, num_reactions, num_comments, num_shares, num_likes, num_loves, num_wows, num_hahas, num_sads, num_angrys])
                         
                 # if there is no next page, we're done.
                 if 'paging' in users.keys() and 'next' in users['paging'].keys():
@@ -232,7 +250,7 @@ class facebookReader(object):
         f = open("data/" + page_id + "_facebook_users_interactions.csv", 'wb')
         w = csv.writer(f)
         w.writerow(["status_id", "interaction_type", "user_id", "user_name", "comment_id", 
-                    "comment_message", "link_name", "comment_type", "comment_link", "comment_published", 
+                    "comment_message", "parent_comment_id", "link_name", "comment_type", "comment_link", "comment_published", 
                     "num_reactions", "num_comments", "num_shares", "num_likes", "num_loves", "num_wows", 
                     "num_hahas", "num_sads", "num_angrys"])
         f.close()
